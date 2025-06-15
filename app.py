@@ -1,8 +1,23 @@
+from datetime import timedelta
 from flask import Flask, render_template, request, redirect, session, g
+from flask_bcrypt import Bcrypt
+from datetime import timedelta
 import sqlite3
+import pyotp
+
 
 app = Flask(__name__)
 app.secret_key = "dummy_secret"
+
+bcrypt = Bcrypt(app)
+
+app.permanent_session_lifetime = timedelta(minutes=15)
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
+
+
 DATABASE = "database.db"
 
 def get_db():
@@ -24,9 +39,23 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        session['user'] = request.form['username']
-        return redirect('/dashboard')
+        username = request.form['username']
+        password = request.form['password']
+        otp_code = request.form['otp']
+        db = get_db()
+        user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+
+        if user and bcrypt.check_password_hash(user[2], password):
+            otp_secret = user[3]
+            if pyotp.TOTP(otp_secret).verify(otp_code):
+                session['user'] = username
+                return redirect('/dashboard')
+            else:
+                return "Invalid 2FA Code"
+        return "Invalid credentials"
     return render_template('login.html')
+
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -35,7 +64,11 @@ def dashboard():
     return render_template('dashboard.html', username=session['user'])
 
 @app.route('/transfer', methods=['GET', 'POST'])
+
 def transfer():
+    if 'user' not in session:
+        return redirect('/login')
+    
     if request.method == 'POST':
         sender = session.get('user')
         receiver = request.form['receiver']
@@ -53,6 +86,23 @@ def history():
     cursor = db.execute("SELECT * FROM transactions WHERE sender = ?", (session.get('user'),))
     transactions = cursor.fetchall()
     return render_template('history.html', transactions=transactions)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = bcrypt.generate_password_hash(request.form['password']).decode('utf-8')
+        otp_secret = pyotp.random_base32()  # For 2FA
+        db = get_db()
+        try:
+            db.execute("INSERT INTO users (username, password, otp_secret) VALUES (?, ?, ?)",
+                       (username, password, otp_secret))
+            db.commit()
+            return f"Account created! Save this 2FA code: {otp_secret} and scan in Google Authenticator."
+        except sqlite3.IntegrityError:
+            return "Username already exists!"
+    return render_template('register.html')
+
 
 if __name__ == '__main__':
     app.run(debug=True)
