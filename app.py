@@ -2,7 +2,7 @@ from datetime import timedelta
 from flask import Flask, render_template, request, redirect, session, g
 from flask_bcrypt import Bcrypt
 from datetime import timedelta
-import sqlite3
+import pymysql
 import pyotp
 
 
@@ -18,13 +18,16 @@ def make_session_permanent():
     session.permanent = True
 
 
-DATABASE = "database.db"
-
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-    return db
+    if 'db' not in g:
+        g.db = pymysql.connect(
+            host='127.0.0.1',
+            user='flask_user',
+            password='yourpassword',
+            db='dummy_bank',
+            cursorclass=pymysql.cursors.Cursor
+        )
+    return g.db
 
 @app.teardown_appcontext
 def close_connection(exception):
