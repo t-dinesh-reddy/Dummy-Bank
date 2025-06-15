@@ -42,18 +42,32 @@ def login():
         username = request.form['username']
         password = request.form['password']
         otp_code = request.form['otp']
+
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
 
-        if user and bcrypt.check_password_hash(user[2], password):
-            otp_secret = user[3]
-            if pyotp.TOTP(otp_secret).verify(otp_code):
-                session['user'] = username
-                return redirect('/dashboard')
+        if user:
+            # Print debug info in terminal
+            print("User found:", user)
+            print("Entered password:", password)
+            print("Stored hash:", user[2])
+
+            if bcrypt.check_password_hash(user[2], password):
+                print("✅ Password is correct")
+                if pyotp.TOTP(user[3]).verify(otp_code):
+                    print("✅ OTP is correct")
+                    session['user'] = username
+                    return redirect('/dashboard')
+                else:
+                    print("❌ Wrong OTP")
+                    return "Invalid 2FA Code"
             else:
-                return "Invalid 2FA Code"
+                print("❌ Wrong Password")
+        else:
+            print("❌ User not found")
         return "Invalid credentials"
     return render_template('login.html')
+
 
 
 
