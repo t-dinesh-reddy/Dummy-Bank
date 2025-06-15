@@ -1,0 +1,6 @@
+<h2>Transaction History</h2>
+<ul>
+  {% for t in transactions %}
+    <li>{{ t[3] }} - Sent {{ t[2] }} to {{ t[1] }}</li>
+  {% endfor %}
+</ul>
