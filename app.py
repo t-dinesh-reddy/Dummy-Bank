@@ -23,7 +23,7 @@ def get_db():
         g.db = pymysql.connect(
             host='127.0.0.1',
             user='flask_user',
-            password='yourpassword',
+            password='flask1234',
             db='dummy_bank',
             cursorclass=pymysql.cursors.Cursor
         )
@@ -123,3 +123,7 @@ def register():
 
 if __name__ == '__main__':
     app.run(debug=True)
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect('/')    
